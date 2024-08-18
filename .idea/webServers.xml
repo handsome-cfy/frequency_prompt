@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="23b31715-f4cc-4e55-89c9-feb2bdeb6dbd" name="locoop">
+        <fileTransfer rootFolder="/root" accessType="SFTP" host="connect.cqa1.seetacloud.com" port="35812" sshConfigId="e6fd79ef-5432-44f7-9314-d259d29a29d2" sshConfig="root@connect.cqa1.seetacloud.com:35812 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
