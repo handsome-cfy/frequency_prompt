@@ -213,7 +213,7 @@ class CustomCLIP(nn.Module):
         self.dtype = clip_model.dtype
 
         #My Adaption
-        self.frequency_prompt = FrequencyPrompt(8,32,32)
+        self.frequency_prompt = FrequencyPrompt(10,1,1)
 
     def forward(self, image):
         # image[32,3,224,224]

@@ -8,39 +8,50 @@ class FrequencyPrompt(nn.Module):
     def __init__(self,num_bands, num_channels, num_prompts):
         super(FrequencyPrompt, self).__init__()
         # 初始化频率提示，每个通道有一个对应的提示
-        self.prompt = nn.Parameter(torch.randn(num_bands, num_prompts, num_channels))
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.prompt = nn.Parameter(torch.randn(num_bands, num_prompts, num_channels)).to(self.device)
+        self.num_channels = num_channels
+        self.num_bands = num_bands
+        self.num_prompts = num_prompts
 
     def forward(self, featuremap):
         # 提取 frequency_bands，假设其大小为 [32, 8]
         frequency_bands= FeatureMap2FrequencyBands(featuremap)
+        batch_size = featuremap.shape[0]
+        prompt = self.prompt.unsqueeze(0).to(self.device)
+        prompt = prompt.expand(batch_size, -1, -1, -1)
 
         masked_frequency_bands = []
         # 访问不同频率的信息
         for index in range(len(frequency_bands[0])):
 
-            # 对于每一个通道
+            # 对于每一个batch
             frequency_pixel = []
-            for channel in range(len(frequency_bands)):
-                frequency_pixel.append(torch.from_numpy(frequency_bands[channel][index]))
+            for batch in range(len(frequency_bands)):
+                frequency_pixel.append(torch.from_numpy(frequency_bands[batch][index]).to(self.device))
             # [32,HW]
             frequency_pixel = torch.stack(frequency_pixel)
-
+            test = frequency_pixel
             # 第一个不是频率信息，是相似性故跳过
             if index == 0:
                 masked_frequency_bands.append(frequency_pixel)
                 continue
 
+            frequency_pixel = frequency_pixel.unsqueeze(0)
+            frequency_pixel = frequency_pixel.expand(self.num_channels, -1, -1).transpose(0, 1)
+
             # 对应这个频率的prompt[channel=32,num_prompt=32]
-            band_prompt = self.prompt[index]
+            band_prompt = prompt[:,index,:,:]
             M = torch.matmul(band_prompt, frequency_pixel)
 
             mask = torch.sigmoid(M)
 
             masked_frequency_pixel = mask * frequency_pixel
-            masked_frequency_bands.append(masked_frequency_pixel)
+            masked_frequency_bands.append(masked_frequency_pixel.squeeze(2))
 
         # masked_frequency_bands = np.stack(masked_frequency_bands)
-        masked_featuremap = FrequencyBands2FeatureMap(masked_frequency_bands)
+        masked_featuremap = FrequencyBands2FeatureMap(masked_frequency_bands).to(self.device)
+        masked_featuremap = masked_featuremap.to(featuremap.dtype)
 
         if featuremap.requires_grad:
             masked_featuremap.grad = featuremap.grad.clone
@@ -70,7 +81,7 @@ def FrequencyBands2FeatureMap(FrequencyBands,wavelet='db1',level=3):
     for channel in range(len(FrequencyBands[0])):
         channel_frequencies = []
         for signal in FrequencyBands:
-            channel_frequencies.append(signal[channel].detach().numpy())
+            channel_frequencies.append(signal[channel].cpu().detach().numpy())
 
         reconstructed_signal = pywt.waverec(channel_frequencies, wavelet)
         dwt_results.append(torch.from_numpy(reconstructed_signal))
@@ -97,7 +108,7 @@ if __name__ == '__main__':
     import numpy as np
 
     # 假设 input_signals 是形状为 [32, 512] 的 PyTorch 张量
-    input_signals = torch.randn(32, 512)
+    input_signals = torch.randn(100, 512)
 
     # 选择一个小波函数，例如 'db1' 使用Daubechies小波
     wavelet = 'db1'
@@ -121,6 +132,6 @@ if __name__ == '__main__':
         org = pywt.waverec(_singal, wavelet)
 
 
-    fp = FrequencyPrompt(10,32,32)
+    fp = FrequencyPrompt(10,1,1)
     ans = fp(input_signals)
     print(1)
